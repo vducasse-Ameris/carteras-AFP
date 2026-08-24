@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carteras de Inversión de los Fondos de Pensiones — Ameris AGF</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="layout">
+  <!-- ====================== SIDEBAR ====================== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="logo-img" src="assets/MARCA_AMERIS_SOLA_RGB.png" alt="Ameris">
+      <div class="sub">AGF · Inteligencia de mercado AFP</div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-tab="resumen" class="active"><span class="ico">▦</span> Resumen del sistema</button>
+      <button data-tab="afp"><span class="ico">◷</span> Análisis por AFP</button>
+      <button data-tab="clases"><span class="ico">◑</span> Clases de activo</button>
+      <button data-tab="alternativos"><span class="ico">◆</span> Activos alternativos</button>
+      <button data-tab="gestores"><span class="ico">⚑</span> Gestores / Competencia</button>
+      <button data-tab="instrumentos"><span class="ico">◎</span> Instrumentos / Fondos</button>
+      <button data-tab="explorador"><span class="ico">▤</span> Explorador de datos</button>
+    </nav>
+    <div class="foot" id="sidebarFoot"></div>
+  </aside>
+
+  <!-- ====================== MAIN ====================== -->
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Resumen del sistema</h1>
+        <div class="desc" id="pageDesc"></div>
+      </div>
+      <div class="topbar-tools">
+        <div class="cur">
+          <span class="cur-lbl">Moneda</span>
+          <div class="seg" id="segCur">
+            <button data-cur="CLP" class="active">CLP</button>
+            <button data-cur="USD">USD</button>
+          </div>
+          <span id="curRateWrap" class="rate" style="display:none">1 USD =
+            <input type="number" id="curRate" min="1" step="10" value="1000"> CLP</span>
+        </div>
+        <div class="meta-pill" id="metaPill"></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="execsum" id="execsum"></div>
+      <!-- RESUMEN -->
+      <section class="panel active" id="panel-resumen">
+        <div class="kpis" id="kpiResumen"></div>
+        <div class="section-title">Evolución del patrimonio administrado</div>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Patrimonio total del sistema AFP</h3>
+            <p class="hint">Suma de la cartera de los 5 multifondos (A–E) de todas las AFP, por mes.</p>
+            <div class="chart-wrap"><canvas id="chTotal"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Composición por clase de activo</h3>
+            <p class="hint">Participación de cada categoría en el último mes disponible.</p>
+            <div class="chart-wrap"><canvas id="chCompo"></canvas></div>
+          </div>
+        </div>
+        <div class="section-title">Estructura del sistema</div>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Patrimonio por AFP</h3>
+            <p class="hint">Tamaño de cada AFP en el último mes (MM CLP).</p>
+            <div class="chart-wrap"><canvas id="chPorAfp"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Evolución de la composición</h3>
+            <p class="hint">Mezcla de clases de activo del sistema a lo largo del tiempo (% del total).</p>
+            <div class="chart-wrap"><canvas id="chCompoTime"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- POR AFP -->
+      <section class="panel" id="panel-afp">
+        <div class="controls">
+          <div class="control">
+            <label>AFP</label>
+            <select id="afpSel"></select>
+          </div>
+        </div>
+        <div class="kpis" id="kpiAfp"></div>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Composición de cartera</h3>
+            <p class="hint">Distribución por clase de activo (último mes).</p>
+            <div class="chart-wrap"><canvas id="chAfpCompo"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Distribución por multifondo (A–E)</h3>
+            <p class="hint">Patrimonio por tipo de fondo (último mes).</p>
+            <div class="chart-wrap"><canvas id="chAfpFondo"></canvas></div>
+          </div>
+        </div>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Evolución de la cartera por clase de activo</h3>
+            <p class="hint">Monto invertido por categoría a lo largo del tiempo (MM CLP).</p>
+            <div class="chart-wrap tall"><canvas id="chAfpTime"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Perfil de la AFP vs. el sistema</h3>
+            <p class="hint">% de la cartera en cada categoría: AFP seleccionada vs. promedio del sistema.</p>
+            <div class="chart-wrap tall"><canvas id="chAfpVs"></canvas></div>
+          </div>
+        </div>
+
+        <div class="section-title">Cartera alternativa por tipo de estrategia</div>
+        <p class="lead">En qué tipos de fondo alternativo invierte <b id="afpStratName"></b> (deuda,
+          inmobiliario/hipotecario, infraestructura, capital privado). Haz clic en una estrategia para ver
+          el <b>detalle de los fondos</b> y auditar su clasificación.</p>
+        <div id="afpStratPills" class="strat-pills"></div>
+        <div class="table-wrap"><table id="tblAfpStrat"></table></div>
+        <p class="foot-note">La estrategia de cada fondo se <b>estima por su nombre/código</b>: los vehículos
+          extranjeros directos usan el código del instrumento; los fondos de inversión (CFI/PFI/FICE), el
+          nombre del fondo. Usa esta tabla para detectar y corregir clasificaciones erróneas.</p>
+      </section>
+
+      <!-- CLASES DE ACTIVO -->
+      <section class="panel" id="panel-clases">
+        <div class="controls">
+          <div class="control">
+            <label>Categoría</label>
+            <select id="catSel"></select>
+          </div>
+        </div>
+        <div class="kpis" id="kpiClase"></div>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Subclases dentro de la categoría</h3>
+            <p class="hint">Desglose del último mes (MM CLP).</p>
+            <div class="chart-wrap"><canvas id="chSub"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Nacional vs. Extranjero</h3>
+            <p class="hint">Evolución de la categoría por origen del emisor (% del total de la categoría).</p>
+            <div class="chart-wrap"><canvas id="chRegion"></canvas></div>
+          </div>
+        </div>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Evolución de la categoría</h3>
+            <p class="hint">Monto total del sistema en esta categoría (MM CLP).</p>
+            <div class="chart-wrap"><canvas id="chCatTime"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Exposición por AFP</h3>
+            <p class="hint">% de la cartera de cada AFP en esta categoría (último mes).</p>
+            <div class="chart-wrap"><canvas id="chCatAfp"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ALTERNATIVOS -->
+      <section class="panel" id="panel-alternativos">
+        <div class="kpis" id="kpiAlt"></div>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Activos alternativos por clase</h3>
+            <p class="hint">Composición del sistema en el último mes (MM CLP).</p>
+            <div class="chart-wrap"><canvas id="chAltClase"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Evolución de los alternativos</h3>
+            <p class="hint">Monto del sistema por clase de activo alternativo (MM CLP).</p>
+            <div class="chart-wrap"><canvas id="chAltTime"></canvas></div>
+          </div>
+        </div>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Exposición a alternativos por AFP</h3>
+            <p class="hint">% de la cartera total de cada AFP en activos alternativos (último mes).</p>
+            <div class="chart-wrap"><canvas id="chAltPen"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Composición de alternativos por AFP</h3>
+            <p class="hint">Mezcla de clases alternativas en cada AFP (MM CLP, apilado).</p>
+            <div class="chart-wrap"><canvas id="chAltAfp"></canvas></div>
+          </div>
+        </div>
+        <div class="section-title">Matriz de oportunidad</div>
+        <p class="lead">Cada AFP comparada con la exposición promedio del sistema. Una exposición baja
+          frente a pares puede señalar una oportunidad comercial; una alta, un cliente ya consolidado.</p>
+        <div class="table-wrap"><table id="tblOpp"></table></div>
+      </section>
+
+      <!-- GESTORES / COMPETENCIA -->
+      <section class="panel" id="panel-gestores">
+        <div class="controls">
+          <div class="control"><label>Tipo de gestor</label>
+            <div class="seg" id="segGestor">
+              <button data-f="local" class="active">AGF locales</button>
+              <button data-f="global">Gestores globales</button>
+              <button data-f="all">Todos</button>
+            </div>
+          </div>
+          <div class="control"><label>Clase de activo</label>
+            <select id="gestClaseSel"></select>
+          </div>
+        </div>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Ranking de gestores</h3>
+            <p class="hint" id="gestRankHint">Monto en cartera AFP (último mes, MM CLP).</p>
+            <div class="chart-wrap tall"><canvas id="chGestRank"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Evolución de los principales gestores</h3>
+            <p class="hint">Top gestores por monto a lo largo del tiempo (MM CLP).</p>
+            <div class="chart-wrap tall"><canvas id="chGestTime"></canvas></div>
+          </div>
+        </div>
+        <div class="section-title">Flujos del mes — mayores movimientos <span class="xlc-tag">estilo XLC</span></div>
+        <p class="lead" id="moversLead">Cuánto <b>entró o salió</b> en el último mes por gestor (variación del monto
+          vs. el mes anterior) y cómo cambió su <b>cuota de mercado</b>. Verde = entradas, rojo = salidas.
+          Sobre el total de la cartera alternativa de las AFP.</p>
+        <div class="grid c2">
+          <div class="card">
+            <h3>Mayores entradas y salidas del mes</h3>
+            <p class="hint" id="moversHint">Variación del monto en cartera AFP vs. el mes anterior (MM CLP).</p>
+            <div class="chart-wrap tall"><canvas id="chMovers"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Cuota de mercado y su variación</h3>
+            <p class="hint">Participación de cada gestor en el total de alternativos, y su cambio en puntos porcentuales.</p>
+            <div class="table-wrap"><table id="tblMovers"></table></div>
+          </div>
+        </div>
+
+        <div class="section-title">Detalle por gestor y AFP</div>
+        <p class="lead">Quién le vende a quién. Monto de cada gestor en cada AFP (último mes). A <b>mayor
+          monto, más intenso el color</b> de la celda, para ver de un vistazo dónde está fuerte cada gestor.</p>
+        <div class="table-wrap"><table id="tblGest"></table></div>
+      </section>
+
+      
+
+      <!-- INSTRUMENTOS / FONDOS -->
+      <section class="panel" id="panel-instrumentos">
+        <div class="kpis" id="kpiInstr"></div>
+
+        <div class="section-title">Explorar fondos e instrumentos</div>
+        <div class="controls">
+          <div class="control" style="flex:1;min-width:280px">
+            <label>Buscar (nemotécnico · nombre · gestor · ISIN)</label>
+            <input type="search" id="instrSearch" placeholder="Ej: Moneda, CFIMLDL, SQM-B, BTU0300144...">
+          </div>
+          <div class="control"><label>Foco</label>
+            <div class="seg" id="instrFoco">
+              <button data-f="fi" class="active">Fondos de inversión</button>
+              <button data-f="fm">Fondos mutuos</button>
+              <button data-f="all">Todos</button>
+            </div>
+          </div>
+          <div class="control"><label>Filtros</label>
+            <div class="chks">
+              <label class="chk"><input type="checkbox" id="instrMulti"> En ≥2 AFP</label>
+            </div>
+          </div>
+        </div>
+        <div class="instr-legend" id="instrLegend"></div>
+        <div class="count-info" id="instrInfo"></div>
+        <div class="instr-layout">
+          <div class="table-wrap instr-tbl"><table id="tblInstr"></table></div>
+          <div class="card instr-detail" id="instrDetail">
+            <h3 id="instrDetTitle">Selecciona un instrumento</h3>
+            <p class="hint" id="instrDetSub">Haz clic en una fila para ver el detalle por AFP.</p>
+            <div id="instrDetInfo"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- EXPLORADOR -->
+      <section class="panel" id="panel-explorador">
+        <div class="controls">
+          <div class="control"><label>AFP</label><select id="exAfp"></select></div>
+          <div class="control"><label>Categoría</label><select id="exCat"></select></div>
+          <div class="control"><label>Multifondo</label><select id="exFondo"></select></div>
+          <div class="control"><label>Origen</label><select id="exRegion"></select></div>
+          <div class="control"><label>Buscar (emisor · subclase · instrumento)</label><input type="search" id="exSearch" placeholder="Ej: Tesorería, Banco de Chile, capital privado, BTU..."></div>
+          <div class="control"><label>&nbsp;</label><button class="btn" id="exExport">Exportar CSV</button></div>
+        </div>
+        <div class="count-info" id="exInfo"></div>
+        <div class="table-wrap"><table id="tblExplorador"></table></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="lib/chart.umd.js"></script>
+<script src="lib/taxonomia.js"></script>
+<script src="data/datos.js"></script>
+<script src="data/isin.js"></script>
+<script src="data/fondos_dir.js"></script>
+<script src="data/fondos_nombres.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
