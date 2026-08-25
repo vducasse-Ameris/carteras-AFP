@@ -45,6 +45,7 @@
           <span id="curRateWrap" class="rate" style="display:none">1 USD =
             <input type="number" id="curRate" min="1" step="10" value="1000"> CLP</span>
         </div>
+        <button class="btn ghost" id="btnActualizar">⟳ Cargar datos</button>
         <div class="meta-pill" id="metaPill"></div>
       </div>
     </header>
@@ -402,8 +403,87 @@
   </div>
 </div>
 
+<!-- ====================== MODAL: CARGA DE DATOS ====================== -->
+<div class="modal" id="loaderModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Cargar datos</h2>
+      <button class="modal-x" id="loaderClose" title="Cerrar">×</button>
+    </div>
+    <p class="modal-desc">Actualiza el dashboard con la base histórica de carteras de la Superintendencia de
+      Pensiones. Los archivos se procesan <b>localmente en tu navegador</b> (no se suben a ningún servidor).
+      Sigue estos pasos:</p>
+
+    <ol class="ld-steps">
+      <li>
+        <span class="ld-n">1</span>
+        <div class="ld-c"><b>Descarga la base</b> desde el sitio de la Superintendencia
+          (<a href="https://www.spensiones.cl/portal/institucional/594/w3-propertyname-621.html#estadisticas_centro" target="_blank" rel="noopener">abrir Estadísticas e Informes ↗</a>).
+          En la pestaña <b>“Estadísticas y bases de datos”</b> pulsa <b>“Acceso a bases de datos”</b> (la última
+          fila, sin <span class="mono">+</span>). Ya ahí, despliega el <b>primer bloque</b>,
+          <b>“Carteras históricas de Inversión de los Fondos de Pensiones”</b>, y baja la opción
+          <b>“Desde 2016 a la fecha”</b>: se descarga <code>chistAFP.zip</code> (~110 MB).
+          <span class="ld-tip">Hay que entrar navegando: la dirección de la base abierta directamente da error.</span>
+          <div class="ld-mini">
+            <div class="m-title">Acceso a bases de datos públicas</div>
+            <div class="m-row"><span class="m-tx"><b>Carteras históricas de Inversión de los Fondos de Pensiones</b></span><span class="m-pm">−</span></div>
+            <div class="m-opt hl"><span class="m-radio on"></span><span class="m-lnk"><b>Archivos de Carteras Históricas … (Desde 2016 a la fecha)</b> (110,3 MB)</span></div>
+            <div class="m-opt"><span class="m-radio"></span><span class="m-lnk">Archivos de Carteras Históricas … (Desde 2006 a 2015)</span></div>
+            <div class="m-opt"><span class="m-radio"></span><span class="m-lnk">Archivos de Carteras Históricas … (Desde 1996 a 2005)</span></div>
+            <div class="m-close">Fecha de cierre de la Base de Datos: <b>01/MAR/2026</b></div>
+            <div class="m-row dim"><span class="m-tx">Historia Previsional de Afiliados</span><span class="m-pm">+</span></div>
+            <div class="m-row dim">
+              <span class="m-tx">Tablas de Mortalidad · SCOMP · … y varias más</span><span class="m-pm">+</span></div>
+            <div class="m-arrow">↑ descarga esta: <b>“Desde 2016 a la fecha”</b>. La “Fecha de cierre” indica hasta qué mes llegan los datos.</div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <span class="ld-n">2</span>
+        <div class="ld-c"><b>Descomprime el ZIP</b> (clic derecho → Extraer todo). Adentro viene
+          <b>un archivo por año</b>: <span class="mono">cartera_mensual_2016.csv</span>,
+          <span class="mono">…2017.csv</span>, hasta el año en curso.
+          <span class="ld-tip">El ZIP no se puede arrastrar aquí: hay que descomprimirlo primero.</span></div>
+      </li>
+      <li>
+        <span class="ld-n">3</span>
+        <div class="ld-c"><b>Arrastra aquí abajo TODOS los <span class="mono">cartera_mensual_*.csv</span></b>
+          (o haz clic para seleccionarlos). El historial completo, no solo el año nuevo — el dashboard se
+          reconstruye desde cero con lo que sueltes.
+          <span class="ld-tip">No los abras en Excel antes; súbelos tal como salieron del ZIP.</span></div>
+      </li>
+    </ol>
+
+    <div class="dropzone" id="dropZone">
+      <input type="file" id="fileInput" accept=".csv" multiple hidden>
+      <div class="dz-ico">⬆</div>
+      <div>Arrastra aquí los CSV o <b>haz clic para seleccionarlos</b></div>
+      <div class="dz-hint">cartera_mensual_2016.csv, cartera_mensual_2017.csv … (todos los años)</div>
+    </div>
+    <div id="loaderProgress" style="display:none">
+      <div class="bar-track"><div class="bar-fill" id="loaderBar"></div></div>
+      <div class="loader-status" id="loaderStatus"></div>
+    </div>
+    <div id="loaderResult" class="loader-result" style="display:none">
+      <div id="loaderResultTxt"></div>
+      <div class="modal-actions">
+        <button class="btn" id="btnDescargar">⬇ Descargar datos.js (para guardar/compartir)</button>
+        <button class="btn ghost" id="btnReset">Volver a los datos originales</button>
+      </div>
+    </div>
+    <p class="modal-foot">⚠️ Al cargar aquí se reconstruye desde los archivos que sueltes: incluye
+      <b>todo el historial</b> (todos los <code>cartera_mensual_*.csv</code>), no solo el año nuevo. Suelta
+      <b>un archivo por año</b>: si un mismo mes viene en dos archivos, los montos se suman dos veces.
+      Para que el cambio sea permanente y compartible, pulsa <b>⬇ Descargar datos.js</b> y reemplázalo en
+      <code>dashboard/data/</code>. Alternativa sin arrastrar nada: copia los CSV a la carpeta
+      <code>Datos</code> y ejecuta <code>Actualizar datos.bat</code> (ver <i>INSTRUCTIVO - Actualizar
+      datos.html</i>).</p>
+  </div>
+</div>
+
 <script src="lib/chart.umd.js"></script>
 <script src="lib/taxonomia.js"></script>
+<script src="lib/procesar.js"></script>
 <script src="data/datos.js"></script>
 <script src="data/isin.js"></script>
 <script src="data/fondos_dir.js"></script>

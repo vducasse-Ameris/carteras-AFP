@@ -101,7 +101,11 @@ function initData(bundle) {
   SNAP = D.snapshot.data; GL = D.gestores_latest.data; GS = D.gestores_serie.data;
   // MODO PÚBLICO: si el bundle no trae la sección "ameris" (build generado por
   // etl/publicar.js), el dashboard se arma sin la lectura comercial de Ameris.
-  AM = D.ameris || null; PUB = !AM;
+  // El modo público lo define la AUSENCIA del módulo interno lib/ameris.js, no
+  // los datos: así se mantiene aunque el usuario cargue CSV desde el navegador
+  // (procesar.js recalcula una sección "ameris" que el sitio público ignora).
+  PUB = !window.AMERIS_EXT;
+  AM = PUB ? null : (D.ameris || null);
   INSTR = D.instrumentos || { nemos: [], data: [] };
   _intlRows = null; _feeders = null; _chilenos = null; _globKeys = null;   // se recalculan
   instrByNemo = {};
