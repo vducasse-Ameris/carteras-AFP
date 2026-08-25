@@ -309,3 +309,10 @@ table.mini .ami0{color:var(--warn);font-weight:600}
 #tblInstr td:nth-child(2),#tblInstr th:nth-child(2){width:60px;max-width:60px;overflow:hidden}
 #tblInstr td:nth-child(3),#tblInstr th:nth-child(3){width:104px;max-width:none;overflow:visible}
 #tblInstr td:nth-child(4),#tblInstr th:nth-child(4){width:118px;max-width:none}
+
+/* Fondos internacionales (sub-vista de Gestores) */
+#tblIntlGest tbody tr{cursor:pointer}
+#tblIntlGest tbody tr:hover{background:rgba(0,72,216,.06)}
+#tblIntlGest tbody tr.sel{background:rgba(0,72,216,.12)}
+#tblIntlGest tbody tr.sel:hover{background:rgba(0,72,216,.16)}
+#gestViewIntl .tag{color:#fff;border:0}

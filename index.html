@@ -196,6 +196,17 @@
       <!-- GESTORES / COMPETENCIA -->
       <section class="panel" id="panel-gestores">
         <div class="controls">
+          <div class="control"><label>Vista</label>
+            <div class="seg" id="segGestVista">
+              <button data-v="alt" class="active">Gestores de alternativos</button>
+              <button data-v="intl">Fondos internacionales</button>
+              <button data-v="chil">Fondos chilenos: feeder o local</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="gestViewAlt">
+        <div class="controls">
           <div class="control"><label>Tipo de gestor</label>
             <div class="seg" id="segGestor">
               <button data-f="local" class="active">AGF locales</button>
@@ -240,6 +251,99 @@
         <p class="lead">Quién le vende a quién. Monto de cada gestor en cada AFP (último mes). A <b>mayor
           monto, más intenso el color</b> de la celda, para ver de un vistazo dónde está fuerte cada gestor.</p>
         <div class="table-wrap"><table id="tblGest"></table></div>
+        </div><!-- /gestViewAlt -->
+
+        <div id="gestViewIntl" hidden>
+          <div class="kpis" id="kpiIntl"></div>
+          <div class="grid c2">
+            <div class="card">
+              <h3>Composición por tipo de vehículo</h3>
+              <p class="hint">De más líquido (fondos mutuos, ETF) a menos líquido (capital privado,
+                infraestructura, inmobiliario).</p>
+              <div class="chart-wrap"><canvas id="chIntlVeh"></canvas></div>
+            </div>
+            <div class="card">
+              <h3>Mayores gestoras internacionales</h3>
+              <p class="hint" id="intlRankHint">Monto en cartera AFP (último mes).</p>
+              <div class="chart-wrap tall"><canvas id="chIntlGest"></canvas></div>
+            </div>
+          </div>
+
+          <div class="section-title">Gestoras y sus fondos</div>
+          <p class="lead">Cada gestora internacional presente en la cartera de las AFP, con el número de
+            fondos que administra y en qué AFP está. <b>Haz clic en una gestora</b> para ver sus fondos
+            uno a uno.</p>
+          <div class="controls">
+            <div class="control" style="flex:1;min-width:260px">
+              <label>Buscar (gestora · fondo · ISIN)</label>
+              <input type="search" id="intlSearch" placeholder="Ej: PIMCO, Schroders, iShares, IE0002459539...">
+            </div>
+            <div class="control"><label>Tipo de vehículo</label>
+              <select id="intlVehSel"></select>
+            </div>
+          </div>
+          <div class="grid c2">
+            <div class="card">
+              <h3>Gestoras</h3>
+              <p class="hint" id="intlGestHint"></p>
+              <div class="table-wrap"><table id="tblIntlGest"></table></div>
+            </div>
+            <div class="card">
+              <h3 id="intlDetTit">Fondos</h3>
+              <p class="hint" id="intlDetSub">Selecciona una gestora en la tabla de la izquierda.</p>
+              <div class="table-wrap"><table id="tblIntlFondos"></table></div>
+              <div class="section-title" style="margin:20px 0 10px">Acceso vía AGF chilena</div>
+              <div id="intlFeeders"></div>
+            </div>
+          </div>
+          <p class="foot-note">«Fondos internacionales» comprende fondos mutuos y de inversión extranjeros,
+            ETF y vehículos de activos alternativos con emisor extranjero; se excluyen bonos, acciones,
+            derivados y caja. La <b>gestora se deduce del nombre del emisor</b> que reporta la
+            Superintendencia: en fondos mutuos y ETF ese campo trae el nombre completo del fondo, y en
+            capital privado trae directamente a la gestora.</p>
+          <p class="foot-note"><b>Sobre el vínculo con AGF chilenas:</b> la Superintendencia no reporta
+            qué administradora local intermedia un fondo extranjero — cuando la AFP lo compra
+            directamente, no hay intermediario. La columna <b>AGF local (feeder)</b> se construye al
+            revés: busca <b>fondos chilenos</b> (CFI/PFI) de la cartera cuyo nombre declare la
+            estrategia global que replican, como «Picton-KKR Americas XII» o «Moneda Carlyle Europe
+            Partners V». Depende de que el fondo chileno tenga nombre en el directorio
+            (<span class="mono">Nemo.xlsx</span>), así que es un <b>piso, no un censo</b>:
+            «directo» significa que no se detectó feeder, no que con certeza no exista.</p>
+        </div><!-- /gestViewIntl -->
+
+        <div id="gestViewChil" hidden>
+          <div class="kpis" id="kpiChil"></div>
+          <div class="section-title">¿Estrategia propia o vehículo de acceso?</div>
+          <p class="lead">Los fondos de inversión chilenos (CFI/PFI) que las AFP tienen en cartera, separados
+            entre los que son <b>feeder</b> —replican la estrategia de un gestor global y lo declaran en su
+            nombre, como «Picton-KKR Americas XII»— y los de <b>estrategia local</b>, originados por la propia
+            AGF chilena.</p>
+          <div class="controls">
+            <div class="control"><label>Mostrar</label>
+              <div class="seg" id="segChil">
+                <button data-c="todos" class="active">Todos</button>
+                <button data-c="feeder">Solo feeder</button>
+                <button data-c="local">Solo estrategia local</button>
+              </div>
+            </div>
+            <div class="control" style="flex:1;min-width:240px">
+              <label>Buscar (fondo · AGF · gestor global)</label>
+              <input type="search" id="chilSearch" placeholder="Ej: Picton, KKR, Moneda, inmobiliario...">
+            </div>
+          </div>
+          <div class="card">
+            <h3>Fondos de inversión chilenos en cartera AFP</h3>
+            <p class="hint" id="chilHint"></p>
+            <div class="table-wrap"><table id="tblChil"></table></div>
+            <p class="foot-note" id="chilMas"></p>
+          </div>
+          <p class="foot-note"><b>Cómo se determina:</b> se busca el nombre de un gestor global dentro del
+            nombre del fondo chileno, descartando las AGF chilenas (para que la administradora al inicio del
+            nombre no lo marque como feeder) y las palabras genéricas. Es una <b>inferencia por nombre</b>, no
+            un dato reportado por la Superintendencia: un feeder cuyo nombre no menciona la estrategia
+            aparecerá como local. Los fondos sin nombre en el directorio
+            (<span class="mono">Nemo.xlsx</span>) se marcan aparte y no se cuentan en ninguno de los dos grupos.</p>
+        </div><!-- /gestViewChil -->
       </section>
 
       

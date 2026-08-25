@@ -103,6 +103,7 @@ function initData(bundle) {
   // etl/publicar.js), el dashboard se arma sin la lectura comercial de Ameris.
   AM = D.ameris || null; PUB = !AM;
   INSTR = D.instrumentos || { nemos: [], data: [] };
+  _intlRows = null; _feeders = null; _chilenos = null; _globKeys = null;   // se recalculan
   instrByNemo = {};
   (INSTR.data || []).forEach(([ni, ai, v]) => { (instrByNemo[ni] = instrByNemo[ni] || []).push([ai, v]); });
   instrRows = (INSTR.nemos || []).map((r, i) => ({
@@ -150,24 +151,20 @@ const TABS = {
   resumen: { title: "Resumen del sistema", desc: "Visión global del patrimonio administrado por las AFP y su composición.", render: renderResumen },
   afp: { title: "Análisis por AFP", desc: "Perfil de inversión de cada Administradora de Fondos de Pensiones.", render: renderAfp },
   clases: { title: "Clases de activo", desc: "Comportamiento de cada clase de activo en el sistema AFP.", render: renderClases },
-  alternativos: { title: "Activos alternativos", desc: "El universo donde compite Ameris AGF: tamaño, crecimiento y oportunidades.", render: renderAlt },
+  alternativos: { title: "Activos alternativos", desc: "Tamaño, crecimiento y distribución del mercado de activos alternativos de las AFP.", render: renderAlt },
   gestores: { title: "Gestores / Competencia", desc: "Quién administra los activos alternativos de las AFP.", render: renderGestores },
-  ameris: { title: "Posición Ameris", desc: "Posicionamiento de Ameris Capital AGF en la cartera de las AFP.", render: renderAmeris },
-  instrumentos: { title: "Instrumentos / Fondos", desc: "Fondos por nemotécnico: dónde está Ameris, dónde hay oportunidad y qué AFP comparten cada fondo.", render: renderInstrumentos },
+  instrumentos: { title: "Instrumentos / Fondos", desc: "Fondos por nemotécnico: qué AFP invierte en cada uno y quiénes los comparten.", render: renderInstrumentos },
   explorador: { title: "Explorador de datos", desc: "Consulta libre de la cartera del último mes disponible.", render: renderExplorador },
 };
+if (window.AMERIS_EXT) TABS.ameris = window.AMERIS_EXT.tab;
+
 let rendered = {}, currentTab = "resumen";
 
 // En modo público se retiran del DOM la pestaña "Posición Ameris" y los bloques
 // de lectura comercial, y se neutraliza el texto de las descripciones.
-const TABS_DESC_PUB = {
-  alternativos: "Tamaño, crecimiento y distribución del mercado de activos alternativos de las AFP.",
-  instrumentos: "Fondos por nemotécnico: qué AFP invierte en cada uno y quiénes los comparten.",
-};
 function aplicarModoPublico() {
   if (!PUB) return;
   delete TABS.ameris;
-  for (const k in TABS_DESC_PUB) if (TABS[k]) TABS[k].desc = TABS_DESC_PUB[k];
   ["[data-tab='ameris']", "#panel-ameris", "#instrConclTitle", "#instrConcl",
    "#chkInstrAmeris", "#gestAmerisHint"].forEach(sel => {
     const el = document.querySelector(sel); if (el) el.remove();
@@ -223,24 +220,10 @@ function renderExecSummary(tab) {
     el.innerHTML = s ? `<span class="es-lbl">Qué mirar aquí</span>${s}` : "";
     return;
   }
-  switch (tab) {
-    case "resumen":
-      s = `El sistema AFP administra <b>${fmtBig(totalLatest)}</b>${g12 != null ? ` (${g12 >= 0 ? "+" : ""}${pct(g12)} en 12 meses)` : ""}. Los <b>activos alternativos</b> —donde compite Ameris— pesan <b>${pct(altPenSystem)}</b> (${fmtBig(altSystemLatest)}). Abajo: la evolución del patrimonio y cómo se reparte por clase de activo y por AFP.`; break;
-    case "afp":
-      s = `Elige una AFP para ver su cartera, sus multifondos (A–E) y su evolución. El dato clave para Ameris es la barra <b>“vs. exposición del sistema”</b>: si invierte en alternativos <b>menos</b> que el promedio, hay espacio. Más abajo, <b>“cartera alternativa por tipo de estrategia”</b> muestra en qué tipos de fondo invierte (deuda, inmobiliario, infraestructura, capital privado); haz clic en una estrategia para ver el <b>detalle fondo por fondo</b>.`; break;
-    case "clases":
-      s = `Elige una clase de activo y verás cuánto pesa en el sistema, si es <b>nacional o extranjera</b>, su evolución y qué AFP la prefieren. La clase <b>Alternativos</b> es el foco comercial de Ameris.`; break;
-    case "alternativos":
-      s = `El mercado alternativo suma <b>${fmtBig(altSystemLatest)}</b> (<b>${pct(altPenSystem)}</b> del sistema). La <b>matriz de oportunidad</b> marca qué AFP están sub-invertidas frente a sus pares; más abajo, <b>“¿en qué tipo de fondos invierte cada AFP?”</b> abre la cartera por estrategia (deuda, inmobiliario, infraestructura, capital privado) y sugiere <b>qué producto ofrecerle a cada una</b>.`; break;
-    case "gestores":
-      s = `Ranking de administradoras en el mercado alternativo de las AFP.${amRank ? ` Ameris es <b>#${amRank}</b> entre las AGF locales.` : ""} Cambia entre <b>AGF locales</b> (competencia directa) y gestores globales. En la tabla, <b>a más color, más monto</b>: se ve al instante dónde está fuerte cada gestor y en qué AFP.`; break;
-    case "ameris":
-      s = `Ameris tiene <b>${fmtBig(totAm)}</b> colocados en <b>${nCli} de ${AFPS.length}</b> AFP${amRank ? ` (#${amRank} entre las AGF locales)` : ""}.${amAbsent.length ? ` Aún ausente en <b>${amAbsent.join(", ")}</b> → oportunidad de cross-sell.` : ""} El detalle fondo por fondo está en <b>Instrumentos / Fondos</b>.`; break;
-    case "instrumentos":
-      s = `Busca un fondo por su <b>nombre o nemotécnico</b> y verás cuánto invierte cada AFP y quiénes lo comparten. Arriba, <b>“Lecturas para Ameris”</b> resume dónde está Ameris, la competencia más adoptada y la mayor oportunidad.`; break;
-    case "explorador":
-      s = `Consulta libre de <b>toda la cartera</b> del último mes. Filtra por AFP, categoría, multifondo u origen, busca un instrumento y <b>exporta a CSV</b> para tus análisis.`; break;
-  }
+  // Los textos con lectura comercial de Ameris viven en lib/ameris.js,
+  // que no se copia al build público.
+  if (window.AMERIS_EXT) s = window.AMERIS_EXT.execSum(tab,
+        { g12, totAm, nCli, amRank, amAbsent });
   el.innerHTML = s ? `<span class="es-lbl">Qué mirar aquí</span>${s}` : "";
 }
 document.getElementById("nav").addEventListener("click", e => {
@@ -543,6 +526,20 @@ function renderGestores() {
       drawGestores();
     });
   }
+  const vista = document.getElementById("segGestVista");
+  if (vista && !vista.dataset.wired) {
+    vista.dataset.wired = "1";
+    vista.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      [...vista.children].forEach(x => x.classList.toggle("active", x === b));
+      const v = b.dataset.v;
+      document.getElementById("gestViewAlt").hidden = v !== "alt";
+      document.getElementById("gestViewIntl").hidden = v !== "intl";
+      document.getElementById("gestViewChil").hidden = v !== "chil";
+      if (v === "intl") renderIntl();
+      if (v === "chil") renderChilenos();
+    });
+  }
   drawGestores();
 }
 function gestAgg() {
@@ -567,7 +564,9 @@ function drawGestores() {
     data: top.map(t => t[1].mm), backgroundColor: top.map(t => t[0] === "Ameris" ? AMERIS : (t[1].local ? C_TEAL : PEER)) }] },
     options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: moneyTip() }, scales: { x: axMoney(), y: { grid: { display: false } } } } });
 
-  const wanted = top.slice(0, 8).map(t => t[0]).filter(g => D.gestores_serie.top.includes(g));
+  // "top" puede faltar en bundles antiguos guardados en el navegador: sin él, no se filtra.
+  const serieTop = (D.gestores_serie && D.gestores_serie.top) || null;
+  const wanted = top.slice(0, 8).map(t => t[0]).filter(g => !serieTop || serieTop.includes(g));
   const byG = {}; wanted.forEach(g => byG[g] = Array(MESES.length).fill(0));
   GS.forEach(([m, g, v]) => { if (byG[g]) byG[g][m] += v; });
   mkChart("chGestTime", { type: "line", data: { labels: MESES, datasets: wanted.map((g, k) => ({
@@ -601,6 +600,481 @@ function drawGestores() {
 
 // "Flujos del mes" (estilo XLC): mayores entradas/salidas por gestor + cuota de mercado y su variación.
 // Usa gestores_serie (monto mensual por gestor, universo alternativos). Respeta el filtro local/global/todos.
+/* ===========================================================================
+   FONDOS INTERNACIONALES  (sub-vista de Gestores / Competencia)
+   Vehículos de inversión con emisor extranjero, agrupados por la gestora que
+   los administra. Se calcula desde `instrRows` (último snapshot), así que se
+   actualiza solo con cada carga de datos.
+   =========================================================================== */
+
+// código de instrumento -> tipo de vehículo (solo fondos; sin bonos ni derivados)
+const INTL_TIPOS = {
+  CMEV: "Fondo mutuo", CMED: "Fondo mutuo",
+  ETFA: "ETF", ETFB: "ETF", ETFC: "ETF",
+  FICE: "Fondo de inversión", CIEV: "Fondo de inversión", CIED: "Fondo de inversión",
+  VCPE: "Capital privado", ACPE: "Capital privado", CCPE: "Capital privado", KCPE: "Capital privado",
+  VDPE: "Deuda privada", ADPE: "Deuda privada", CDPE: "Deuda privada", KDPE: "Deuda privada",
+  CSIN: "Deuda privada",
+  VIPE: "Infraestructura", AIPE: "Infraestructura", CIPE: "Infraestructura", KIPE: "Infraestructura",
+  VRPE: "Inmobiliario", ARPE: "Inmobiliario", CRPE: "Inmobiliario", KRPE: "Inmobiliario",
+};
+const INTL_ORDEN = ["Fondo mutuo", "ETF", "Fondo de inversión", "Capital privado",
+                    "Deuda privada", "Infraestructura", "Inmobiliario"];
+const INTL_COLOR = { "Fondo mutuo": "#0a2a5e", "ETF": "#004cdc", "Fondo de inversión": "#1e9fe0",
+  "Capital privado": "#33bffd", "Deuda privada": "#59dbd6", "Infraestructura": "#16b3a8",
+  "Inmobiliario": "#0d7f77" };
+
+// La fuente no trae la gestora como campo: se deduce del nombre del emisor.
+// En fondos mutuos/ETF ese campo trae el nombre completo del fondo
+// ("PIMCO FUNDS GLOBAL INVESTORS SERIES PLC..."); en capital privado, la gestora ("ARDIAN").
+const INTL_MULTI = ["MORGAN STANLEY", "GOLDMAN SACHS", "T ROWE PRICE", "T. ROWE PRICE",
+  "JANUS HENDERSON", "NEUBERGER BERMAN", "BAILLIE GIFFORD", "FRANKLIN TEMPLETON",
+  "EDMOND DE ROTHSCHILD", "FIRST SENTIER", "NINETY ONE", "PARTNERS GROUP", "HARBOURVEST PARTNERS",
+  "LEXINGTON PARTNERS", "ALPINVEST PARTNERS", "STEPSTONE GROUP", "BAIN CAPITAL", "ADAMS STREET",
+  "PANTHEON VENTURES", "HAMILTON LANE", "NEW MOUNTAIN", "CAPITAL GROUP", "WELLINGTON MANAGEMENT",
+  "LOOMIS SAYLES", "BNY MELLON", "BNP PARIBAS", "JULIUS BAER", "HARDING LOEVNER", "WILLIAM BLAIR",
+  "POLAR CAPITAL", "STONE HARBOR", "LEGG MASON", "BROWN ADVISORY", "SILVER LAKE", "OAK HILL",
+  "OAKTREE CAPITAL", "APOLLO GLOBAL", "ARES MANAGEMENT", "AUDAX GROUP", "BLACKSTONE",
+  "CARLYLE GROUP", "CVC CAPITAL", "EQT ", "GENERAL ATLANTIC", "INSIGHT PARTNERS", "KKR ",
+  "PERMIRA", "JORDAN COMPANY", "PROVIDENCE EQUITY", "SUMMIT PARTNERS", "TA ASSOCIATES",
+  "THOMA BRAVO", "VISTA EQUITY", "WARBURG PINCUS", "ADVENT INTERNATIONAL", "CINVEN",
+  "HELLMAN FRIEDMAN", "LEEDS EQUITY", "MADISON DEARBORN", "NORDIC CAPITAL", "PLATINUM EQUITY",
+  "TPG ", "AMERICAN SECURITIES", "BERKSHIRE PARTNERS", "GENSTAR CAPITAL", "LINDEN CAPITAL",
+  "GOLUB CAPITAL", "OWL ROCK", "SIXTH STREET", "BARINGS ", "MUZINICH", "ASHMORE", "MFS ",
+  "GLOBAL INFRASTRUCTURE", "MONARCH ALTERNATIVE", "HPS INVESTMENT", "STONEPEAK", "NEW MOUNTAIN",
+  "BROOKFIELD", "DIGITAL BRIDGE", "ANTIN INFRASTRUCTURE", "COPENHAGEN INFRASTRUCTURE",
+  "PGIM ", "DWS ", "GAM ", "AXA ", "UBS ", "M&G", "ABRDN", "ABERDEEN", "MONEDA",
+  "COMPASS GROUP", "LARRAIN VIAL", "LARRAINVIAL", "BTG PACTUAL", "CREDICORP CAPITAL",
+  "SANTANDER ASSET", "ITAU ", "SURA ", "PRINCIPAL "].sort((a, b) => b.length - a.length);
+
+const INTL_ALIAS = {
+  ISHARES: "iShares (BlackRock)", BLACKROCK: "BlackRock", JPMORGAN: "J.P. Morgan AM",
+  JPM: "J.P. Morgan AM", PIMCO: "PIMCO", SCHRODER: "Schroders", SCHRODERS: "Schroders",
+  VANGUARD: "Vanguard", VONTOBEL: "Vontobel", LAZARD: "Lazard", MAN: "Man Group",
+  AMUNDI: "Amundi", ROBECO: "Robeco", INVESCO: "Invesco", FIDELITY: "Fidelity",
+  TEMPLETON: "Franklin Templeton", FRANKLIN: "Franklin Templeton", NORDEA: "Nordea",
+  CANDRIAM: "Candriam", PICTET: "Pictet", CARMIGNAC: "Carmignac", JUPITER: "Jupiter",
+  COMGEST: "Comgest", EASTSPRING: "Eastspring", MATTHEWS: "Matthews Asia", BLUEBAY: "BlueBay",
+  ARTISAN: "Artisan Partners", ARDIAN: "Ardian", MONEDA: "Moneda (Patria)",
+  COLUMBIA: "Columbia Threadneedle", THREADNEEDLE: "Columbia Threadneedle",
+  ALLIANZ: "Allianz GI", HSBC: "HSBC AM", "GOLDMAN SACHS": "Goldman Sachs AM",
+  "MORGAN STANLEY": "Morgan Stanley IM", "WELLINGTON MANAGEMENT": "Wellington",
+  WELLINGTON: "Wellington", "T ROWE PRICE": "T. Rowe Price", "T. ROWE PRICE": "T. Rowe Price",
+  "BAILLIE GIFFORD": "Baillie Gifford", "NINETY ONE": "Ninety One",
+  "JANUS HENDERSON": "Janus Henderson", "NEUBERGER BERMAN": "Neuberger Berman",
+  "PARTNERS GROUP": "Partners Group", "HARBOURVEST PARTNERS": "HarbourVest",
+  "LEXINGTON PARTNERS": "Lexington Partners", "ALPINVEST PARTNERS": "AlpInvest",
+  "STEPSTONE GROUP": "StepStone", "HAMILTON LANE": "Hamilton Lane", "ADAMS STREET": "Adams Street",
+  "PANTHEON VENTURES": "Pantheon", "BAIN CAPITAL": "Bain Capital", "CAPITAL GROUP": "Capital Group",
+  "BNY MELLON": "BNY Mellon IM", "BNP PARIBAS": "BNP Paribas AM", "FIRST SENTIER": "First Sentier",
+  ABRDN: "abrdn", ABERDEEN: "abrdn", "CVC CAPITAL": "CVC Capital Partners",
+  "OAKTREE CAPITAL": "Oaktree", "APOLLO GLOBAL": "Apollo", "ARES MANAGEMENT": "Ares",
+  BLACKSTONE: "Blackstone", "CARLYLE GROUP": "Carlyle", "WARBURG PINCUS": "Warburg Pincus",
+  "ADVENT INTERNATIONAL": "Advent International", "COMPASS GROUP": "Compass Group",
+  "BTG PACTUAL": "BTG Pactual", LARRAINVIAL: "LarrainVial", "LARRAIN VIAL": "LarrainVial",
+  "CREDICORP CAPITAL": "Credicorp Capital", EQT: "EQT", "JORDAN COMPANY": "The Jordan Company",
+  "GLOBAL INFRASTRUCTURE": "Global Infrastructure Partners", "MONARCH ALTERNATIVE": "Monarch",
+  "HPS INVESTMENT": "HPS", "ANTIN INFRASTRUCTURE": "Antin", "BROOKFIELD": "Brookfield",
+  CVC: "CVC Capital Partners", "NEW MOUNTAIN": "New Mountain",
+  "COPENHAGEN INFRASTRUCTURE": "Copenhagen Infrastructure", "STONEPEAK": "Stonepeak",
+};
+const INTL_SIGLAS = new Set(["DWS", "UBS", "AXA", "DFA", "SPDR", "EQT", "MFS", "PGIM", "GAM",
+  "BNP", "HSBC", "JPM", "TCW", "RWC", "GQG", "KKR", "TPG", "CVC", "AQR", "LGT", "NN", "GMO",
+  "BNY", "SEI", "TIAA", "PGGM", "HPS", "GIP"]);
+
+const _tc = s => (window.TAX && window.TAX.titleCase) ? window.TAX.titleCase(s)
+  : s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+
+function gestorIntl(emisor) {
+  let n = (emisor || "").toUpperCase().replace(/[^A-Z0-9&. ]/g, " ").replace(/\s+/g, " ").trim();
+  if (!n) return "(sin emisor)";
+  if (n.indexOf("THE ") === 0) n = n.slice(4);
+  // familias que se reconocen por el nombre del vehículo, no por el del gestor
+  if (n.indexOf("SELECT SECTOR SPDR") >= 0 || n.indexOf("SPDR") === 0) return "State Street (SPDR)";
+  if (n.indexOf("DFA INVESTMENT") === 0 || n.indexOf("DIMENSIONAL") === 0) return "Dimensional (DFA)";
+  for (const m of INTL_MULTI) {
+    if (n.indexOf(m) === 0) {
+      const k = m.trim();
+      return INTL_ALIAS[k] || (INTL_SIGLAS.has(k) ? k : _tc(k));
+    }
+  }
+  const tok = n.split(" ")[0];
+  return INTL_ALIAS[tok] || (INTL_SIGLAS.has(tok) ? tok : _tc(tok));
+}
+
+// filas de fondos internacionales (se calcula una vez por carga de datos)
+let _intlRows = null;
+function intlRows() {
+  if (_intlRows) return _intlRows;
+  _intlRows = instrRows
+    .filter(r => INTL_TIPOS[r.tipo] && window.TAX.clasificar(r.tipo).region === "Extranjero")
+    .map(r => ({
+      nemo: r.nemo, tipo: r.tipo, veh: INTL_TIPOS[r.tipo], nombre: r.emisor || r.nemo,
+      gestor: gestorIntl(r.emisor), mm: r.total,
+      afps: (instrByNemo[r.i] || []).slice().sort((a, b) => b[1] - a[1]),
+    }))
+    .sort((a, b) => b.mm - a.mm);
+  return _intlRows;
+}
+
+/* ---------------------------------------------------------------------------
+   FEEDERS LOCALES  —  qué AGF chilena canaliza a cada gestor global.
+   La Superintendencia NO reporta un vínculo entre un fondo extranjero y una
+   AGF local: cuando la AFP compra el fondo extranjero directamente, no hay
+   intermediario chileno (el campo grupo_economico viene vacío en todo lo
+   extranjero). El vínculo sí existe, pero en los FONDOS CHILENOS (CFI/PFI)
+   que son feeders de una estrategia global y lo declaran en su nombre:
+   "Picton-KKR Americas XII", "Moneda Carlyle Europe Partners V".
+   Se detecta por nombre, así que depende del directorio de nombres de fondos.
+   --------------------------------------------------------------------------- */
+let _feeders = null;
+function feedersLocales() {
+  if (_feeders) return _feeders;
+  _feeders = instrRows
+    .filter(r => /^(CFI|PFI)/i.test(r.nemo) &&
+                 window.TAX.clasificar(r.tipo).region === "Nacional")
+    .map(r => ({
+      nemo: r.nemo,
+      nombre: dirName(r.nemo) || "",
+      agf: r.mgr.label || r.emisor || "(sin gestor)",
+      mm: r.total,
+      afps: (instrByNemo[r.i] || []).slice().sort((a, b) => b[1] - a[1]),
+    }))
+    .filter(f => f.nombre);       // sin nombre no se puede detectar la estrategia
+  return _feeders;
+}
+
+// Palabras demasiado genéricas para identificar una estrategia: si se usaran como
+// clave, "Global" haría match con cualquier fondo chileno que diga "Global".
+const CLAVE_STOP = new Set(["GLOBAL", "INMOBILIARIA", "INMOBILIARIO", "INTERNATIONAL",
+  "INVESTMENT", "INVESTMENTS", "INVERSIONES", "FONDO", "FONDOS", "FUND", "FUNDS",
+  "CAPITAL", "PRIVATE", "EQUITY", "ASSET", "TRUST", "INDEX", "SELECT", "RENTA",
+  "RENTAS", "ADVISORS", "HOLDING", "GROUP", "PARTNERS", "MANAGEMENT", "INFRAESTRUCTURA",
+  "DEUDA", "CREDITO", "ACCIONES", "MULTI", "DESARROLLO", "INMOBILIARIAS"]);
+
+// claves de búsqueda de un gestor global dentro del nombre de un fondo chileno
+function clavesGestor(label) {
+  const s = (label || "").toUpperCase();
+  const claves = [];
+  const par = s.match(/\(([^)]+)\)/);          // "iShares (BlackRock)" -> BLACKROCK
+  if (par) claves.push(par[1].trim());
+  const base = s.replace(/\([^)]*\)/g, "").replace(/[.]/g, "").trim();
+  if (base) claves.push(base);
+  // quitar sufijos genéricos que no aportan ("AM", "IM", "GI", "GROUP")
+  const corto = base.replace(/\b(AM|IM|GI|GROUP|PARTNERS|CAPITAL|MANAGEMENT)\b/g, "").trim();
+  if (corto && corto.length >= 3) claves.push(corto);
+  return [...new Set(claves.filter(k => k.length >= 3 && !CLAVE_STOP.has(k)))];
+}
+
+// Las siglas cortas (KKR, EQT, CVC) se buscan como palabra completa, para no
+// dar falsos positivos dentro de otra palabra.
+function _reClave(k) {
+  const esc = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(k.length <= 4 ? "\\b" + esc + "\\b" : esc, "i");
+}
+
+function feedersDe(labelGestor) {
+  const claves = clavesGestor(labelGestor);
+  if (!claves.length) return [];
+  return feedersLocales()
+    .filter(f => claves.some(k => _reClave(k).test(f.nombre)))
+    .sort((a, b) => b.mm - a.mm);
+}
+
+// resumen "AGF local" para la tabla de gestoras
+function agfsDe(labelGestor) {
+  const set = new Set(feedersDe(labelGestor).map(f => f.agf));
+  return [...set];
+}
+
+function intlAgrupar(rows) {
+  const m = new Map();
+  for (const f of rows) {
+    let g = m.get(f.gestor);
+    if (!g) { g = { gestor: f.gestor, mm: 0, fondos: [], afps: new Set(), veh: new Set() }; m.set(f.gestor, g); }
+    g.mm += f.mm; g.fondos.push(f); g.veh.add(f.veh);
+    for (const a of f.afps) g.afps.add(a[0]);
+  }
+  return [...m.values()].sort((a, b) => b.mm - a.mm);
+}
+
+let intlVeh = "__all__", intlSel = null;
+
+function renderIntl() {
+  const sel = document.getElementById("intlVehSel");
+  if (!sel.dataset.wired) {
+    sel.dataset.wired = "1";
+    const pres = INTL_ORDEN.filter(v => intlRows().some(f => f.veh === v));
+    sel.innerHTML = `<option value="__all__">Todos los vehículos</option>` +
+      pres.map(v => `<option value="${v}">${v}</option>`).join("");
+    sel.onchange = () => { intlVeh = sel.value; intlSel = null; drawIntl(); };
+    document.getElementById("intlSearch").oninput = () => { intlSel = null; drawIntl(); };
+  }
+  drawIntl();
+}
+
+function intlFiltrados() {
+  const q = (document.getElementById("intlSearch").value || "").trim().toLowerCase();
+  return intlRows().filter(f => {
+    if (intlVeh !== "__all__" && f.veh !== intlVeh) return false;
+    if (q && !(f.gestor + " " + f.nombre + " " + f.nemo).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function drawIntl() {
+  const rows = intlFiltrados();
+  const grupos = intlAgrupar(rows);
+  const tot = rows.reduce((a, f) => a + f.mm, 0);
+
+  // ---- KPI ----
+  const nAfp = new Set(); rows.forEach(f => f.afps.forEach(a => nAfp.add(a[0])));
+  const top10 = grupos.slice(0, 10).reduce((a, g) => a + g.mm, 0);
+  document.getElementById("kpiIntl").innerHTML =
+    kpiCard("Fondos internacionales", nf(rows.length), `${fmtBig(tot)} · ${mesLbl(M.mes_ultimo)}`, "accent")
+    + kpiCard("Gestoras", nf(grupos.length), `presentes en ${nAfp.size} de ${AFPS.length} AFP`, "accent")
+    + kpiCard("% del sistema AFP", tot && totalLatest ? pct(100 * tot / totalLatest) : "—",
+        `sobre ${fmtBig(totalLatest)}`, "accent")
+    + kpiCard("Concentración", tot ? pct(100 * top10 / tot) : "—", "en las 10 mayores gestoras", "accent");
+
+  // ---- composición por vehículo ----
+  const porVeh = INTL_ORDEN.map(v => [v, rows.filter(f => f.veh === v).reduce((a, f) => a + f.mm, 0)])
+    .filter(x => x[1] > 0);
+  mkChart("chIntlVeh", {
+    type: "doughnut",
+    data: { labels: porVeh.map(x => x[0]),
+      datasets: [{ data: porVeh.map(x => cv(x[1])), backgroundColor: porVeh.map(x => INTL_COLOR[x[0]]),
+        borderWidth: 0 }] },
+    options: { cutout: "58%", plugins: { legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: moneyTip() } }
+  });
+
+  // ---- ranking de gestoras ----
+  const top = grupos.slice(0, 15);
+  document.getElementById("intlRankHint").textContent =
+    (intlVeh === "__all__" ? "Todas las gestoras" : intlVeh) + " — monto en cartera AFP (último mes).";
+  mkChart("chIntlGest", {
+    type: "bar",
+    data: { labels: top.map(g => g.gestor),
+      datasets: [{ label: "Monto", data: top.map(g => cv(g.mm)), backgroundColor: C_TEAL }] },
+    options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: moneyTip() },
+      scales: { x: axMoney(), y: { grid: { display: false } } } }
+  });
+
+  // ---- tabla de gestoras ----
+  document.getElementById("intlGestHint").innerHTML =
+    `<b>${nf(grupos.length)}</b> gestoras · <b>${nf(rows.length)}</b> fondos · <b>${fmtBig(tot)}</b>` +
+     (grupos.length > 60 ? ` — se listan las 60 mayores; usa el buscador para el resto.` : "");
+  const max = grupos.length ? grupos[0].mm : 1;
+  let h = `<thead><tr><th>Gestora</th><th class="num">Fondos</th><th>AGF local (feeder)</th>
+    <th>AFP</th><th class="num">Monto</th></tr></thead><tbody>`;
+  grupos.slice(0, 60).forEach((g, i) => {
+    const dots = AFPS.map((a, k) => {
+      const on = g.afps.has(k);
+      return `<i class="${on ? "on" : "off"}" ${on ? `style="background:${afpColor(k)}"` : ""}
+        title="${afpNameByIdx(k)}${on ? "" : ": sin posición"}"></i>`;
+    }).join("");
+    h += `<tr data-g="${encodeURIComponent(g.gestor)}" class="clickable${intlSel === g.gestor ? " sel" : ""}">
+      <td><b>${g.gestor}</b><div class="z" style="font-size:11.5px">${[...g.veh].join(" · ")}</div></td>
+      <td class="num">${nf(g.fondos.length)}</td>
+      <td style="font-size:12px">${(() => { const a = agfsDe(g.gestor);
+        return a.length ? a.join(", ") : '<span class="z">directo</span>'; })()}</td>
+      <td><span class="afp-dots">${dots}</span></td>
+      <td class="num bar-cell"><div class="bar" style="width:${100 * g.mm / max}%"></div>
+        <span><b>${fmtMM(g.mm)}</b></span></td></tr>`;
+  });
+  const tbl = document.getElementById("tblIntlGest");
+  tbl.innerHTML = h + "</tbody>";
+  if (!tbl.dataset.wired) {
+    tbl.dataset.wired = "1";
+    tbl.addEventListener("click", e => {
+      const tr = e.target.closest("tr[data-g]"); if (!tr) return;
+      intlSel = decodeURIComponent(tr.dataset.g);
+      drawIntl();
+    });
+  }
+
+  // ---- detalle de la gestora seleccionada ----
+  const g = grupos.find(x => x.gestor === intlSel) || grupos[0];
+  if (!g) {
+    document.getElementById("intlDetTit").textContent = "Fondos";
+    document.getElementById("intlDetSub").textContent = "Ningún fondo coincide con la búsqueda.";
+    document.getElementById("tblIntlFondos").innerHTML = "";
+    return;
+  }
+  document.getElementById("intlDetTit").textContent = g.gestor;
+  document.getElementById("intlDetSub").innerHTML =
+    `<b>${nf(g.fondos.length)}</b> fondo(s) · <b>${fmtBig(g.mm)}</b> · presente en
+     <b>${g.afps.size} de ${AFPS.length}</b> AFP`;
+  let f = `<thead><tr><th>Fondo</th><th>Vehículo</th><th class="num">Monto</th>
+    <th>AFP con posición</th></tr></thead><tbody>`;
+  g.fondos.slice().sort((a, b) => b.mm - a.mm).forEach(x => {
+    f += `<tr><td><b>${x.nombre}</b><div class="z" style="font-size:11px">${x.nemo} · ${x.tipo}</div></td>
+      <td><span class="tag" style="background:${INTL_COLOR[x.veh]};color:#fff;border:0">${x.veh}</span></td>
+      <td class="num"><b>${fmtMM(x.mm)}</b></td>
+      <td style="font-size:12px">${x.afps.map(a => afpNameByIdx(a[0])).join(", ") || "—"}</td></tr>`;
+  });
+  document.getElementById("tblIntlFondos").innerHTML = f + "</tbody>";
+
+  // ---- feeders locales de esta gestora ----
+  const fd = feedersDe(g.gestor);
+  const box = document.getElementById("intlFeeders");
+  if (!fd.length) {
+    box.innerHTML = `<p class="hint" style="margin:0">Las AFP acceden a esta gestora
+      <b>directamente</b>: no se detectan fondos chilenos que la canalicen.</p>`;
+  } else {
+    const totF = fd.reduce((a, x) => a + x.mm, 0);
+    box.innerHTML = `<p class="hint" style="margin:0 0 8px">
+      <b>${nf(fd.length)}</b> fondo(s) chileno(s) invierten en estrategias de
+      <b>${g.gestor}</b> por <b>${fmtBig(totF)}</b>.</p>
+      <div class="table-wrap"><table><thead><tr><th>AGF chilena</th><th>Fondo feeder</th>
+      <th class="num">Monto</th></tr></thead><tbody>` +
+      fd.map(x => `<tr><td><b>${x.agf}</b></td>
+        <td>${x.nombre}<div class="z" style="font-size:11px">${x.nemo}</div></td>
+        <td class="num"><b>${fmtMM(x.mm)}</b></td></tr>`).join("") +
+      `</tbody></table></div>`;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   FONDOS CHILENOS: FEEDER vs. ESTRATEGIA LOCAL
+   Un fondo chileno (CFI/PFI) es "feeder" cuando su nombre declara la estrategia
+   global que replica ("Picton-KKR Americas XII"). Se detecta contra un
+   diccionario de gestores globales construido con:
+     · los gestores que ya aparecen en la vista de fondos internacionales, y
+     · el listado de gestores globales conocidos (INTL_MULTI / INTL_ALIAS),
+   descartando las AGF chilenas —para que el nombre de la propia administradora
+   al inicio del fondo no lo marque como feeder— y las palabras genéricas.
+   --------------------------------------------------------------------------- */
+let _globKeys = null;
+function clavesGlobales() {
+  if (_globKeys) return _globKeys;
+  // clave de búsqueda -> etiqueta comercial con la que se muestra el gestor
+  const cand = new Map();
+  const add = (k, label) => { if (!cand.has(k)) cand.set(k, label); };
+  INTL_MULTI.forEach(m => {
+    const k = m.trim().toUpperCase();
+    add(k, INTL_ALIAS[k] || (INTL_SIGLAS.has(k) ? k : _tc(k)));
+  });
+  Object.values(INTL_ALIAS).forEach(v => clavesGestor(v).forEach(k => add(k, v)));
+  intlAgrupar(intlRows()).forEach(g => clavesGestor(g.gestor).forEach(k => add(k, g.gestor)));
+
+  // Palabras que son nombre de una AGF chilena presente en la cartera: no marcan
+  // estrategia global. Se derivan de los propios datos, así que no hay que
+  // mantener una lista a mano cuando entra una administradora nueva.
+  const locales = new Set();
+  instrRows.forEach(r => {
+    if (!/^(CFI|PFI)/i.test(r.nemo)) return;
+    const et = (r.mgr.label || r.emisor || "");
+    et.toUpperCase().replace(/[^A-Z0-9 ]/g, " ").split(/\s+/)
+      .forEach(t => { if (t.length >= 3) locales.add(t); });
+  });
+
+  _globKeys = [...cand.keys()]
+    .filter(k => k.length >= 3 && !CLAVE_STOP.has(k))
+    // fuera las AGF chilenas: no convierten a un fondo en feeder
+    .filter(k => {
+      const c = window.TAX.clasificarEmisor(k);
+      if (c && c[1]) return false;
+      return !k.split(" ").every(t => locales.has(t));
+    })
+    .map(k => ({ k, re: _reClave(k), label: cand.get(k) }))
+    .sort((a, b) => b.k.length - a.k.length);   // primero la coincidencia más específica
+  return _globKeys;
+}
+
+// Devuelve el gestor global que replica un fondo chileno, o "" si es estrategia local.
+function estrategiaGlobalDe(nombreFondo) {
+  if (!nombreFondo) return "";
+  for (const { k, re, label } of clavesGlobales()) {
+    if (re.test(nombreFondo)) return label || INTL_ALIAS[k] || (INTL_SIGLAS.has(k) ? k : _tc(k));
+  }
+  return "";
+}
+
+let _chilenos = null;
+function fondosChilenos() {
+  if (_chilenos) return _chilenos;
+  _chilenos = instrRows
+    .filter(r => /^(CFI|PFI)/i.test(r.nemo) && window.TAX.clasificar(r.tipo).region === "Nacional")
+    .map(r => {
+      const nombre = dirName(r.nemo) || "";
+      return {
+        nemo: r.nemo, nombre, tipo: r.tipo,
+        agf: r.mgr.label || r.emisor || "(sin gestor)",
+        mm: r.total,
+        afps: (instrByNemo[r.i] || []).slice().sort((a, b) => b[1] - a[1]),
+        // sin nombre no se puede determinar: se marca aparte, no como "local"
+        clase: !nombre ? "?" : (estrategiaGlobalDe(nombre) ? "feeder" : "local"),
+        global: nombre ? estrategiaGlobalDe(nombre) : "",
+      };
+    })
+    .sort((a, b) => b.mm - a.mm);
+  return _chilenos;
+}
+
+let chilFiltro = "todos";
+
+function renderChilenos() {
+  const seg = document.getElementById("segChil");
+  if (!seg.dataset.wired) {
+    seg.dataset.wired = "1";
+    seg.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      chilFiltro = b.dataset.c;
+      [...seg.children].forEach(x => x.classList.toggle("active", x === b));
+      drawChilenos();
+    });
+    document.getElementById("chilSearch").oninput = drawChilenos;
+  }
+  drawChilenos();
+}
+
+function drawChilenos() {
+  const todos = fondosChilenos();
+  const q = (document.getElementById("chilSearch").value || "").trim().toLowerCase();
+  const rows = todos.filter(f => {
+    if (chilFiltro !== "todos" && f.clase !== chilFiltro) return false;
+    if (q && !(f.nombre + " " + f.agf + " " + f.nemo + " " + f.global).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const suma = a => a.reduce((x, f) => x + f.mm, 0);
+  const fee = todos.filter(f => f.clase === "feeder"), loc = todos.filter(f => f.clase === "local"),
+        ind = todos.filter(f => f.clase === "?");
+  const totCon = suma(fee) + suma(loc);
+
+  document.getElementById("kpiChil").innerHTML =
+    kpiCard("Fondos chilenos en cartera", nf(todos.length), `${fmtBig(suma(todos))} · ${mesLbl(M.mes_ultimo)}`, "accent")
+    + kpiCard("Feeder de un gestor global", nf(fee.length), fmtBig(suma(fee)), "accent")
+    + kpiCard("Estrategia local", nf(loc.length), fmtBig(suma(loc)), "accent")
+    + kpiCard("Peso de los feeder", totCon ? pct(100 * suma(fee) / totCon) : "—",
+        ind.length ? `${nf(ind.length)} sin nombre, no clasificados` : "sobre los fondos con nombre", "accent");
+
+  document.getElementById("chilHint").innerHTML =
+    `<b>${nf(rows.length)}</b> fondo(s) · <b>${fmtBig(suma(rows))}</b>`;
+
+  let h = `<thead><tr><th>Fondo</th><th>AGF chilena</th><th>Tipo de estrategia</th>
+    <th class="num">Monto</th><th>AFP</th></tr></thead><tbody>`;
+  rows.slice(0, 120).forEach(f => {
+    const badge = f.clase === "feeder"
+      ? `<span class="tag" style="background:#004cdc;color:#fff;border:0">Feeder</span>
+         <span style="font-size:12px;margin-left:6px">${f.global}</span>`
+      : f.clase === "local"
+        ? `<span class="tag" style="background:#16b3a8;color:#fff;border:0">Local</span>`
+        : `<span class="tag" style="background:#e2e8f0;color:#64748b;border:0">Sin nombre</span>`;
+    h += `<tr><td><b>${f.nombre || "(sin nombre en el directorio)"}</b>
+        <div class="z" style="font-size:11px">${f.nemo} · ${f.tipo}</div></td>
+      <td style="font-size:12.5px">${f.agf}</td>
+      <td>${badge}</td>
+      <td class="num"><b>${fmtMM(f.mm)}</b></td>
+      <td style="font-size:11.5px">${f.afps.map(a => afpNameByIdx(a[0])).join(", ") || "—"}</td></tr>`;
+  });
+  document.getElementById("tblChil").innerHTML = h + "</tbody>";
+  document.getElementById("chilMas").innerHTML = rows.length > 120
+    ? `Se listan los 120 mayores de ${nf(rows.length)}. Usa el buscador para el resto.` : "";
+}
+
 function drawMovers() {
   if (LAST < 1) return;
   const localOf = {}; GL.forEach(([g, loc]) => { if (!(g in localOf)) localOf[g] = loc; });
@@ -672,57 +1146,7 @@ function drawMovers() {
 /* ===========================================================================
    TAB: AMERIS
    =========================================================================== */
-function renderAmeris() {
-  const serie = Array(MESES.length).fill(0);
-  AM.serie.data.forEach(([m, a, v]) => serie[m] += v);
-  const totAm = serie[LAST], prev12 = LAST >= 12 ? serie[LAST - 12] : 0;
-  const amByAfp = {};
-  AM.serie.data.forEach(([m, a, v]) => { if (m === LAST) amByAfp[a] = (amByAfp[a] || 0) + v; });
-  const nClientes = Object.values(amByAfp).filter(v => v > 0).length;
-  const localAgg = {};
-  GL.forEach(([g, loc, clase, afp, v]) => { if (loc) localAgg[g] = (localAgg[g] || 0) + v; });
-  const localRank = Object.entries(localAgg).sort((a, b) => b[1] - a[1]);
-  const amRank = localRank.findIndex(x => x[0] === "Ameris") + 1;
-  const nFondos = AM.detalle.data.length;
 
-  document.getElementById("kpiAmeris").innerHTML =
-    kpiCard("Ameris en cartera AFP", fmtBig(totAm), deltaMoMYoY(serie, LAST), "spot")
-    + kpiCard("Ranking AGF locales", amRank ? ("#" + amRank + " de " + localRank.length) : "—", "en activos alternativos", "spot")
-    + kpiCard("AFP clientes", nClientes + " de " + AFPS.length, "con posición en fondos Ameris")
-    + kpiCard("Fondos en cartera", nFondos, "vehículos distintos");
-
-  mkChart("chAmTime", { type: "line", data: { labels: MESES, datasets: [{ label: "Ameris", data: serie,
-    borderColor: AMERIS, backgroundColor: "rgba(0,72,216,.12)", fill: true, tension: .25, pointRadius: 0, borderWidth: 2 }] },
-    options: { plugins: { legend: { display: false }, tooltip: moneyTip() }, scales: { x: xTime, y: axMoney() } } });
-
-  const ord = Object.keys(amByAfp).map(Number).sort((a, b) => amByAfp[b] - amByAfp[a]);
-  mkChart("chAmAfp", { type: "bar", data: { labels: ord.map(afpNameByIdx), datasets: [{ label: "Ameris",
-    data: ord.map(i => amByAfp[i]), backgroundColor: ord.map(i => afpColor(i)) }] },
-    options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: moneyTip() }, scales: { x: axMoney(), y: { grid: { display: false } } } } });
-
-  const top = localRank.slice(0, 12);
-  mkChart("chAmRank", { type: "bar", data: { labels: top.map(t => t[0]), datasets: [{ label: "Monto",
-    data: top.map(t => t[1]), backgroundColor: top.map(t => t[0] === "Ameris" ? AMERIS : PEER) }] },
-    options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: moneyTip() }, scales: { x: axMoney(), y: { grid: { display: false } } } } });
-
-  const finClase = "Fondos de Inversión Nacionales";
-  const ord2 = [...AFPS.keys()].filter(i => amByAfp[i]).sort((a, b) =>
-    (amByAfp[b] || 0) / (afpAltClaseLatest[b + "|" + finClase] || 1) - (amByAfp[a] || 0) / (afpAltClaseLatest[a + "|" + finClase] || 1));
-  mkChart("chAmShare", { type: "bar", data: { labels: ord2.map(afpNameByIdx), datasets: [{ label: "Cuota Ameris en FI nacional",
-    data: ord2.map(i => 100 * (amByAfp[i] || 0) / (afpAltClaseLatest[i + "|" + finClase] || 1)), backgroundColor: ord2.map(i => afpColor(i)) }] },
-    options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${pct(c.parsed.x)} de los FI nacionales de la AFP` } } },
-      scales: { x: { ticks: { callback: v => v + "%" } }, y: { grid: { display: false } } } } });
-
-  const rows = AM.detalle.data.slice().sort((a, b) => b[3] - a[3]);
-  const maxV = rows.length ? rows[0][3] : 1;
-  let html = `<thead><tr><th>AFP</th><th>Fondo</th><th>Nemotécnico</th><th class="num">Monto</th><th class="num">Unidades</th></tr></thead><tbody>`;
-  rows.forEach(r => {
-    html += `<tr class="ameris"><td>${afpName(r[0])}</td><td><b>${fundNameOf(r[1], r[2])}</b></td><td><span class="nemo-code">${r[1] || "·"}</span></td>
-      <td class="num bar-cell"><div class="bar" style="width:${100 * r[3] / maxV}%"></div><span>${fmtMM(r[3])}</span></td>
-      <td class="num">${nf(r[4])}</td></tr>`;
-  });
-  document.getElementById("tblAmeris").innerHTML = html + "</tbody>";
-}
 
 /* ===========================================================================
    TAB: INSTRUMENTOS / FONDOS  (decodificación + lectura para Ameris)
@@ -841,7 +1265,7 @@ function afpSums(rows) {
   return { univ, amer };
 }
 
-// KPIs + Lecturas para Ameris (dependen del foco)
+// KPIs de la pestaña de instrumentos (dependen del foco)
 function instrHead() {
   const U = instrUniverse();
   const lbl = FOCO_LBL[instrFoco];
@@ -860,88 +1284,10 @@ function instrHead() {
        + kpiCard("Presencia de Ameris", amPresent.size + " de " + AFPS.length + " AFP",
            amAbsent.length ? ("ausente en " + amAbsent.map(afpNameByIdx).join(", ")) : "presente en todas", "spot"));
 
-  if (!PUB) instrConclusiones(U, amF, amPresent, amAbsent);
+  if (!PUB && window.AMERIS_EXT) window.AMERIS_EXT.conclusiones(U, amF, amPresent, amAbsent);
 }
 
-function instrConclusiones(U, amF, amPresent, amAbsent) {
-  const lbl = FOCO_LBL[instrFoco];
-  // --- Card A: cobertura de Ameris ---
-  let A = `<div class="card concl"><h4>Cobertura de Ameris</h4>`;
-  if (!amF.length) {
-    A += `<div class="sub">Ameris no tiene ${lbl} en la cartera de las AFP en el último mes.</div>`;
-    if (instrFoco !== "fi") A += `<div class="sub">Cambia el foco a “Fondos de inversión” para ver su posición.</div>`;
-  } else {
-    const amMonto = amF.reduce((s, r) => s + r.total, 0);
-    // agrupar por nombre de fondo (series y promesa+cuota del mismo fondo se combinan;
-    // las promesas PFI caen todas en "Fondo de Iniciativa Privada")
-    const gmap = {};
-    amF.forEach(r => {
-      const nm = fundName(r);
-      const g = gmap[nm] || (gmap[nm] = { name: nm, total: 0, n: 0, afps: new Set(), best: r });
-      g.total += r.total; g.n++;
-      (instrByNemo[r.i] || []).forEach(([ai]) => g.afps.add(ai));
-      if (r.total > g.best.total) g.best = r;
-    });
-    const gArr = Object.values(gmap).sort((a, b) => b.total - a.total);
-    A += `<div class="big">${fmtBig(amMonto)}</div><div class="sub">${gArr.length} fondos · presente en ${amPresent.size} de ${AFPS.length} AFP</div>`;
-    A += `<div class="gap-list"><div class="lbl">Presente en</div>` +
-      [...amPresent].sort((a, b) => a - b).map(k => `<span class="chip-ok">${afpNameByIdx(k)}</span>`).join("") + `</div>`;
-    if (amAbsent.length) {
-      A += `<div class="gap-list"><div class="lbl">Ausente en — oportunidad de cross-sell</div>` +
-        amAbsent.map(k => `<span class="chip-warn">${afpNameByIdx(k)}</span>`).join("") + `</div>`;
-    }
-    A += `<div class="gap-list"><div class="lbl">Fondos Ameris (monto en cartera)</div>` +
-      `<table class="mini funds"><tbody>` +
-      gArr.map(g => {
-        const disp = g.name.replace(/^Ameris\s+/i, "");
-        return `<tr data-i="${g.best.i}">` +
-          `<td class="fn" title="${g.name.replace(/"/g, "&quot;")}">${disp}` +
-          (g.n > 1 ? ` <span class="muted">·${g.n}</span>` : ``) + `</td>` +
-          `<td class="num">${fmtMM(g.total)}</td><td class="num afpc">${g.afps.size} AFP</td></tr>`;
-      }).join("") +
-      `</tbody></table></div>`;
-  }
-  A += `</div>`;
 
-  // --- Card B: fondos de competencia más adoptados ---
-  const comp = U.filter(r => !r.mgr.ameris).slice().sort((a, b) => b.nafp - a.nafp || b.total - a.total).slice(0, 6);
-  let B = `<div class="card concl"><h4>Competencia más adoptada</h4>` +
-    `<div class="sub">Más AFP = producto “validado” por el mercado. Referencia competitiva para Ameris.</div><ol class="rank">`;
-  comp.forEach(r => {
-    B += `<li data-i="${r.i}"><span class="rk-main" title="${(fundName(r) + " (" + r.nemo + ")").replace(/"/g, "&quot;")}">${fundName(r)} <span class="nemo-paren">(${r.nemo})</span></span>` +
-      `<span class="rk-val">${r.nafp} AFP · ${fmtBig(r.total)}</span></li>`;
-  });
-  B += `</ol></div>`;
-
-  // --- Card C: apetito por AFP vs Ameris ---
-  const { univ, amer } = afpSums(U);
-  const order = [...AFPS.keys()].sort((a, b) => univ[b] - univ[a]);
-  const maxU = Math.max(1, ...univ);
-  // oportunidad limpia = AFP con apetito relevante pero SIN posición en Ameris
-  const absentes = order.filter(k => !amer[k] && univ[k] > maxU * 0.05);
-  const oppSet = new Set(absentes);
-  let rowsHtml = "";
-  order.forEach(k => {
-    const share = univ[k] ? 100 * amer[k] / univ[k] : 0;
-    rowsHtml += `<tr class="${oppSet.has(k) ? "opp" : ""}"><td>${afpNameByIdx(k)}</td>` +
-      `<td class="num">${fmtMM(univ[k])}</td>` +
-      `<td class="num ${amer[k] ? "ami" : "ami0"}">${amer[k] ? fmtMM(amer[k]) + ` <span class="muted">(${pct(share)})</span>` : "—"}</td></tr>`;
-  });
-  let C = `<div class="card concl"><h4>Apetito por ${lbl} vs. Ameris</h4>` +
-    `<div class="sub">Cuánto invierte cada AFP en este universo y qué parte va a Ameris (cuota).</div>` +
-    `<table class="mini"><thead><tr><th>AFP</th><th class="num">En ${lbl}</th><th class="num">Ameris</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
-  if (absentes.length) {
-    const k = absentes[0];
-    C += `<div class="opp-line">Mayor oportunidad: <b>${afpNameByIdx(k)}</b> invierte ${fmtBig(univ[k])} en ${lbl} y aún <b>no tiene fondos de Ameris</b>.</div>`;
-  } else if (amF.length) {
-    const pres = order.filter(k => amer[k]).sort((a, b) => amer[a] / (univ[a] || 1) - amer[b] / (univ[b] || 1));
-    if (pres.length) { const k = pres[0];
-      C += `<div class="opp-line">Menor exposición: en <b>${afpNameByIdx(k)}</b> Ameris es solo ${pct(100 * amer[k] / (univ[k] || 1))} de sus ${lbl} — espacio para crecer.</div>`; }
-  }
-  C += `</div>`;
-
-  document.getElementById("instrConcl").innerHTML = A + B + C;
-}
 
 function afpDots(i) {
   const amt = {}; (instrByNemo[i] || []).forEach(([ai, v]) => amt[ai] = v);
@@ -954,7 +1300,8 @@ function afpDots(i) {
 function instrFiltered() {
   const q = document.getElementById("instrSearch").value.trim().toLowerCase();
   const onlyMulti = document.getElementById("instrMulti").checked;
-  const onlyAm = document.getElementById("instrAmeris").checked;
+  const chkAm = document.getElementById("instrAmeris");   // no existe en el build público
+  const onlyAm = !!(chkAm && chkAm.checked);
   return instrUniverse().filter(r => {
     if (onlyMulti && r.nafp < 2) return false;
     if (onlyAm && !r.mgr.ameris) return false;
@@ -1010,8 +1357,10 @@ function selectInstr(i) {
       `<span class="val">${fmtMM(p[1])}</span><span class="pctv">${pct(100 * p[1] / total)}</span></div>`).join("") + `</div>`;
   // oportunidad / brecha
   if (absent.length) {
-    info += `<div class="gap-list"><div class="lbl">${r.mgr.ameris ? "No lo tienen — oportunidad de cross-sell" : "No invierten"}</div>` +
-      absent.map(k => `<span class="${r.mgr.ameris ? "chip-warn" : "afp-chip"}">${afpNameByIdx(k)}</span>`).join("") + `</div>`;
+    // la etiqueta comercial la aporta lib/ameris.js (uso interno); sin él, texto neutro
+    const gap = (!PUB && window.AMERIS_EXT) ? window.AMERIS_EXT.gapLabel(r) : null;
+    info += `<div class="gap-list"><div class="lbl">${gap ? gap.lbl : "No invierten"}</div>` +
+      absent.map(k => `<span class="${gap ? gap.chip : "afp-chip"}">${afpNameByIdx(k)}</span>`).join("") + `</div>`;
   }
   document.getElementById("instrDetInfo").innerHTML = info;
 }
@@ -1205,7 +1554,12 @@ window.addEventListener("unhandledrejection", e => fatal("Promesa rechazada: " +
 
 (async function boot() {
   let bundle = null;
-  try { bundle = await withTimeout(idbGet(), 1500, null); } catch (e) {}
+  // El bundle guardado en el navegador solo se usa donde existe el cargador de CSV.
+  // En el build público no lo hay, y además en file:// todas las páginas comparten
+  // el mismo IndexedDB: sin esto, el sitio público levantaría el bundle interno.
+  if (document.getElementById("loaderModal")) {
+    try { bundle = await withTimeout(idbGet(), 1500, null); } catch (e) {}
+  }
   if (!(bundle && bundle.meta)) bundle = window.AFP_DATA || null;
   if (!bundle) { document.body.innerHTML = "<p style='padding:40px'>No hay datos. Genera <code>data/datos.js</code> o carga los CSV.</p>"; return; }
   try { const q = new URLSearchParams(location.search); if ((q.get("cur") || "").toLowerCase() === "usd") CUR.mode = "USD"; } catch (e) {}
